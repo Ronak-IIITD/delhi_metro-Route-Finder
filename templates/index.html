@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Find the best route between Delhi Metro stations with fare calculation, travel time estimates, and alternative routes.">
+    <meta name="keywords" content="Delhi Metro, Route Finder, DMRC, Metro Map, Fare Calculator">
+    <title>Delhi Metro Route Finder | Plan Your Journey</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚇</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <h1>🚇 Delhi Metro Route Finder</h1>
+            <p class="subtitle">Plan your journey across Delhi's metro network</p>
+        </header>
+        
+        <main>
+            <!-- Station Selection Form -->
+            <div class="form-container">
+                <div class="station-selector">
+                    <label for="source-search">
+                        <span class="label-icon">📍</span> From Station
+                    </label>
+                    <div class="search-input-container">
+                        <input 
+                            type="text" 
+                            id="source-search" 
+                            class="station-search" 
+                            placeholder="Type to search stations..."
+                            autocomplete="off"
+                            aria-label="Search source station"
+                        >
+                        <input type="hidden" id="source" name="source">
+                        <div id="source-suggestions" class="suggestions-dropdown hidden"></div>
+                    </div>
+                    <div class="quick-select">
+                        <span class="quick-label">Popular:</span>
+                        {% for station in popular_stations[:5] %}
+                        <button type="button" class="quick-station-btn" data-station="{{ station }}" data-target="source">
+                            {{ station }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <button type="button" id="swap-stations-btn" class="swap-btn" title="Swap stations" aria-label="Swap source and destination">
+                    ⇄
+                </button>
+                
+                <div class="station-selector">
+                    <label for="destination-search">
+                        <span class="label-icon">🎯</span> To Station
+                    </label>
+                    <div class="search-input-container">
+                        <input 
+                            type="text" 
+                            id="destination-search" 
+                            class="station-search" 
+                            placeholder="Type to search stations..."
+                            autocomplete="off"
+                            aria-label="Search destination station"
+                        >
+                        <input type="hidden" id="destination" name="destination">
+                        <div id="destination-suggestions" class="suggestions-dropdown hidden"></div>
+                    </div>
+                    <div class="quick-select">
+                        <span class="quick-label">Popular:</span>
+                        {% for station in popular_stations[5:10] %}
+                        <button type="button" class="quick-station-btn" data-station="{{ station }}" data-target="destination">
+                            {{ station }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Route Options -->
+                <div class="route-options">
+                    <div class="option-group">
+                        <label class="option-label">Route Type:</label>
+                        <div class="route-type-buttons">
+                            <button type="button" class="route-type-btn active" data-type="shortest">
+                                ⚡ Fastest
+                            </button>
+                            <button type="button" class="route-type-btn" data-type="least_changes">
+                                🔄 Fewest Changes
+                            </button>
+                            <button type="button" class="route-type-btn" data-type="all">
+                                📊 Compare
+                            </button>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="smart-card-toggle">
+                            <span class="checkmark"></span>
+                            💳 Smart Card (10% off)
+                        </label>
+                    </div>
+                </div>
+                
+                <button id="find-route-btn" class="primary-btn">
+                    <span class="btn-text">Find Route</span>
+                    <span class="btn-loading hidden">
+                        <span class="spinner"></span> Finding...
+                    </span>
+                </button>
+            </div>
+            
+            <!-- Error Message -->
+            <div id="error-message" class="error-container hidden" role="alert"></div>
+            
+            <!-- Results Section -->
+            <div id="result" class="results-section hidden">
+                <!-- Route Comparison (shown when "Compare All" is selected) -->
+                <div id="route-comparison" class="route-comparison hidden">
+                    <h2>🔀 Route Options</h2>
+                    <div id="comparison-cards" class="comparison-grid"></div>
+                </div>
+                
+                <!-- Selected Route Details -->
+                <div id="selected-route">
+                    <h2>📍 Your Route</h2>
+                    
+                    <!-- Route Summary Cards -->
+                    <div class="route-summary-cards">
+                        <div class="summary-card distance-card">
+                            <span class="card-icon">📏</span>
+                            <div class="card-content">
+                                <span class="card-value"><span id="total-distance">0</span> km</span>
+                                <span class="card-label">Distance</span>
+                            </div>
+                        </div>
+                        <div class="summary-card stations-card">
+                            <span class="card-icon">🚉</span>
+                            <div class="card-content">
+                                <span class="card-value"><span id="stations-count">0</span></span>
+                                <span class="card-label">Stations</span>
+                            </div>
+                        </div>
+                        <div class="summary-card time-card">
+                            <span class="card-icon">⏱️</span>
+                            <div class="card-content">
+                                <span class="card-value"><span id="estimated-time">0</span> min</span>
+                                <span class="card-label">Est. Time</span>
+                            </div>
+                        </div>
+                        <div class="summary-card fare-card">
+                            <span class="card-icon">💰</span>
+                            <div class="card-content">
+                                <span class="card-value">₹<span id="fare">0</span></span>
+                                <span class="card-label" id="fare-type">Token Fare</span>
+                            </div>
+                            <div id="fare-savings" class="fare-savings hidden">
+                                Save ₹<span id="savings-amount">0</span> with Smart Card
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Line Changes Alert -->
+                    <div id="line-changes-alert" class="line-changes-alert hidden">
+                        <span class="alert-icon">🔄</span>
+                        <span id="line-changes-text">No line changes required</span>
+                    </div>
+                    
+                    <!-- Metro Map Visualization -->
+                    <div id="metro-map-visualization" class="metro-map-container">
+                        <div class="map-header">
+                            <h3>🗺️ Route Map</h3>
+                            <div class="map-controls">
+                                <button type="button" id="zoom-in-btn" class="map-control-btn" title="Zoom In">+</button>
+                                <button type="button" id="zoom-out-btn" class="map-control-btn" title="Zoom Out">−</button>
+                                <button type="button" id="reset-view-btn" class="map-control-btn" title="Reset View">⟲</button>
+                            </div>
+                        </div>
+                        <div id="metro-map" class="metro-map"></div>
+                        <!-- Map Legend -->
+                        <div class="map-legend">
+                            <div class="legend-item"><span class="legend-dot start"></span> Start</div>
+                            <div class="legend-item"><span class="legend-dot end"></span> End</div>
+                            <div class="legend-item"><span class="legend-dot interchange"></span> Interchange</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Path Details -->
+                    <div class="route-path">
+                        <h3>📋 Station List</h3>
+                        <ul id="path-list" class="path-list"></ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <p class="data-attribution">
+                    📊 Data: Delhi Metro Rail Corporation (DMRC) • Updated: {{ last_updated }}
+                </p>
+                <p class="disclaimer">
+                    ⚠️ Fares and timings are estimates. Please verify at station.
+                </p>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Hidden station data for JavaScript -->
+    <script>
+        window.METRO_DATA = {
+            allStations: {{ stations | tojson }},
+            popularStations: {{ popular_stations | tojson }},
+            interchangeStations: {{ interchange_stations | tojson }}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
