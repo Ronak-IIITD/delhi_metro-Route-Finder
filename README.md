@@ -17,9 +17,6 @@ Ever struggled to figure out the fastest metro route in Delhi? This web app help
 
 I built this as a learning project to understand graph algorithms and full-stack web development.
 
-## Demo
-
-*[Note: Add a screenshot or GIF of your app running here when you get a chance!]*
 
 **Live features:**
 - Search 220+ Delhi Metro stations
